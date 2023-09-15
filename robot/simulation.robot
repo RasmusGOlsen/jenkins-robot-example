@@ -1,6 +1,6 @@
 *** Settings ***
-Library    ./keywords.py
-
+Library      ./keywords.py
+Test Tags    simulation
 
 *** Test Cases ***
 Test A

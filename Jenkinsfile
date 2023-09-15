@@ -2,6 +2,7 @@ pipeline {
     agent any
     triggers { pollSCM "H 20 * * *" }
     options {
+        skipDefaultCheckout(true)
         disableConcurrentBuilds()
         buildDiscarder logRotator(artifactNumToKeepStr: '10')
     }
@@ -21,9 +22,18 @@ pipeline {
     }
     environment {
         BUILDDIR = "_build"
-        RUN_SH = "bin/robot.sh"
+        RUN_SH = "./run.sh"
     }
     stages {
+        stage('checkout') {
+            steps {
+                checkout scmGit(
+                    branches: scm.branches,
+                    extensions: [cleanBeforeCheckout(deleteUntrackedNestedRepositories: true)],
+                    userRemoteConfigs: scm.userRemoteConfigs
+                )
+            }
+        }
         stage(' ') {
             parallel {
                 stage('lint') {
@@ -63,20 +73,15 @@ pipeline {
             steps {
                 sh "${RUN_SH} -i ${STAGE_NAME}"
             }
-            post {
-                success {
-                    archiveArtifacts artifacts: "${BUILDDIR}/*.tar.gz"
-                }
-            }
         }
     }
     post {
         always {
             sh """
-                rebot --nostatusrc --splitlog --merge -output output.xml -x xunit.xml --outputdir ${BUILDDIR} ${BUILDDIR}/*/output.xml
+                rebot --nostatusrc --splitlog -R -o output.xml -x xunit.xml -d ${BUILDDIR} ${BUILDDIR}/*/output.xml
             """
             robot archiveDirName: 'robot-plugin', outputPath: "${BUILDDIR}"
-            junit "${BUILDDIR}/xunit.xml"
+            // junit "${BUILDDIR}/xunit.xml"
         }
         unsuccessful {
             sh("test -d ${BUILDDIR} && tar -cf debug.tar.gz ${BUILDDIR}")
